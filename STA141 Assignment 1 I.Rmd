@@ -1,0 +1,223 @@
+---
+title: "STA141 Assignment 1 I"
+output: word_document
+fontsize: 4pt
+---
+
+
+1. How many observations are there in the data set?
+```{r,message = FALSE, warning = FALSE}
+setwd("~/Desktop/2015 fall/STA 141")
+print(load("vehicles.rda"))
+dim(vposts) #Indicating 34677 observations in the data set.
+```
+2. What are the names of the variables? and what is the class of each variable?
+```{r,message = FALSE, warning = FALSE}
+names(vposts)#The outputs indicate all the names of the variables 
+unlist(sapply(vposts, class))#The outputs indicate the class of each variable
+```
+3. What is the average price of all the vehicles? the median price? and the deciles? Displays these on a plot of the distribution of vehicle prices.
+```{r, message = FALSE, warning = FALSE}
+mean(vposts$price, na.rm = TRUE)  #the average price of all the vehicles is 49449.9.
+median(vposts$price, na.rm = TRUE)  #median price is 6700.
+quantile(vposts$price, na.rm = TRUE,seq(0,1,by= 0.1)) #The deciles of the average price of all the vehicles.
+hist(vposts$price)
+rug(vposts$price,col='red', lwd = 4) #Firstly, detecting the outliers on the histgram plot.
+priceNoOutlier = vposts[ !is.na(vposts$price) & vposts$price <= 21997 & vposts$price > 1200, ] #subsetting the price without the outliers. Choosing these two values according to the 10% and 90% quantile. 
+hist(priceNoOutlier$price, breaks = seq(0, 30000, by = 1000), main = "Histgram of the price without outliers")
+points(quantile(priceNoOutlier$price, na.rm = TRUE,seq(0,1,by= 0.1)), rep(0,11))
+points(mean(priceNoOutlier$price, na.rm = TRUE), 0, col = "red")
+points(median(priceNoOutlier$price, na.rm = TRUE), 0, col = "green")
+#This histogram shows the deciles points on the plot. The red dot displays the mean while the green dot displays the median.
+```
+4. What are the different categories of vehicles, i.e. the type variable/column? What is the proportion for each category ?
+```{r, message = FALSE, warning = FALSE}
+prop.table(table(vposts$type)) #The output indicates 13 types variable and the quantities show the proportion for each category. 
+```
+5. Display the relationship between fuel type and vehicle type.
+```{r, message = FALSE, warning = FALSE}  
+library(ggplot2)
+table(vposts$fuel, vposts$type)
+vposts51 = vposts[ !is.na(vposts$type) & !is.na(vposts$fuel), ]  #Omit the NAs on the variable we need to use to do the plot.
+gg51 = ggplot(vposts51, aes(x = type)) + 
+  geom_bar(position="dodge", color = "grey") +
+  subset_wrap(~fuel, scales = "free_x") + 
+  theme(axis.text.x  = element_text(angle=90, size= 10, color = "black")) 
+gg51
+gg51 + coord_cartesian(ylim=c(0, 350)) #zoom into the area to see more information about the fuel type with fewer counts than gas.  
+```
+
+From the unzoomed plot, we can see the relationship between fuel and vehicle type. Sedan with gas has the largest counts and then suv with gas are larger too. Most vehicles use gas type as their fuel.
+From the zoomed plot, we can see fuel type of other and diesel are second popular. Electric has the least using counts. Trucks use more diesel. Hatchback and sedan use more hybrid. 
+
+Does this depend on transmission type?
+```{r, message = FALSE, warning = FALSE} 
+vposts52 = vposts[ !is.na(vposts$type) & !is.na(vposts$fuel)& !is.na(vposts$transmission), ]
+gg52 = ggplot(vposts52, aes(x = type)) + 
+  geom_bar(position="dodge", color = "grey") +
+  subset_grid(transmission~fuel) +
+  theme(axis.text.x  = element_text(angle=90, size= 7, color = "black")) 
+gg52 
+gg52 + coord_cartesian(ylim=c(0, 550)) #zoom into the area to see more information about manual and other.
+```
+
+From the unzoomed plot, I added transmission type to the plot. We can see automatic is more popular. Automatic sedan with gas has the largest counts and then suv with gas are larger too. 
+From the zoomed plot, sedan using gas with manual and other transmission still have the largest counts. However, coupe with gas has the second large counts in manual while suv with gas is the second in other transmission. Therefore, transmission indeed has some influence on the relationship between vehicle type and fuel.
+
+6. How many different cities are represented in the dataset?
+```{r, message = FALSE, warning = FALSE}
+summary(vposts$city)
+length(summary(vposts$city)) # 7 different cities are represented in the dataset.
+```
+7. Visually display how the number/proportion of "for sale by owner" and "for sale by dealer" varies across city?
+```{r, message = FALSE, warning = FALSE}
+table(vposts$city, vposts$byOwner)  
+plot(table(vposts$city, vposts$byOwner))  
+```
+
+From the plot, the counts of "for sale by owner" and "for sale by dealer" are almost the same across city. Pretty balanced.   
+
+8. What is the largest price for a vehicle in this data set? Examine this and fix the value. Now examine the new highest value for price.
+```{r,message = FALSE, warning = FALSE}
+price = vposts$price
+max(price, na.rm = TRUE)#From the output, I found 600030000 is the largest price for a vehicle.
+price[price == max(price, na.rm = TRUE)] = 29000 #By googling the same car price, I fix this value to $29000.
+max(price, na.rm = TRUE) #The largest value for price became 30002500 now which still makes no sense. Then I change this price as 30000. 
+price[price == max(price, na.rm = TRUE)] = 30000
+max(price, na.rm = TRUE) #The new largest value is 9999999 now.
+```
+9. What are the three most common makes of cars in each city for "sale by owner" and for "sale by dealer"? Are they similar or quite different?
+```{r,message = FALSE, warning = FALSE}
+s = split ( vposts , vposts$byOwner ) 
+#For sale by owner :
+counts = table(s$"TRUE"$city,  s$"TRUE"$maker)
+top3_makes = function(city_counts) {
+    top3 = order(city_counts, decreasing = TRUE)[1:3]
+     colnames(counts)[top3]
+}
+apply(counts, 1, top3_makes) 
+#For sale by dealer
+counts2 = table(s$"FALSE"$city,  s$"FALSE"$maker)
+top3_makes2 = function(city_counts) {
+    top3 = order(city_counts, decreasing = TRUE)[1:3]
+     colnames(counts2)[top3]
+}
+apply(counts2, 1, top3_makes2)  
+```
+Comparing in each city, the toppest 3 common makes of cars are pretty similar between for sale by owner and by dealer. Only ranks between three makes somewhat differ. There are usually two same makes of cars in each city between by owner and by dealer while NYC and Sac is all the same between them.
+
+10. Visually compare the distribution of the age of cars for different cities and for "sale by owner" and "sale by dealer". Provide an interpretation of the plots, i.e., what are the key conclusions and insights?
+```{r, message = FALSE, warning = FALSE}
+vposts$age = 2015 - vposts$year  #add a new column age.
+vage = vposts[ !is.na(vposts$age) & vposts$age <= 100 & vposts$age >= 0, ]
+ggplot(vage, aes(x = age)) +
+  geom_density() +
+  subset_grid(city~byOwner) +
+  xlim(c(0,30)) #After age = 30, the density becomes pretty small (closed to 0). For getting more information, set the limit to 30.
+```
+
+Using density curves to compare the distribution of the age of cars for different cities and for "sale by owner" showing TRUE in the plot and "sale by dealer" showing FALSE in the plot. There are more old cars in for sale by owner while more new cars in for sale by dealer. The distribution of sale by owner in each city is pretty similar. 
+
+11.Plot the locations of the posts on a map? What do you notice?
+```{r,message = FALSE, warning = FALSE}
+library(maps)
+map("state")
+points(vposts$long,vposts$lat, col = "red")
+```
+
+From the map, we can see most cars are in California (southwest) and near Massachusetts state (northeast). Many of them are in Colorado and near Illinois.
+
+12.Summarize the distribution of fuel type, drive, transmission, and vehicle type. Find a good way to display this information.
+```{r,,message = FALSE, warning = FALSE}
+vposts12 = vposts[ !is.na(vposts$drive) & !is.na(vposts$fuel) &!is.na(vposts$type) &!is.na(vposts$transmission), ]  #Omit the NAs on the variable we need to use to do the plot. 
+gg12 =
+ggplot(vposts12, aes(x = drive, fill = transmission)) +
+geom_bar(position="dodge", color = "black") + 
+  subset_grid(fuel ~ type)+
+  theme(axis.text.x  = element_text(angle=90, size= 10, color = "black")) +   
+  scale_fill_manual(values=c("grey0", "grey40", "grey70"))
+gg12
+#Zoom the area to see more information
+gg12 + coord_cartesian(ylim=c(0, 170)) 
+gg12 + coord_cartesian(ylim=c(0, 20)) 
+```
+
+From the unzoomed plot, we can see automatic sedan with fwd using gas has the largest counts. Then automatic suv with 4wd using gas is the second largest. Gas is the most popular fuel type. Automatic is the most popular transmission.
+From the first zoomed plot, truck with 4wd using diesel has larger counts. For diesel, there are many auto pickup with 4wd and auto truck with rwd and auto van with rwd as well. As for hybrid, there are many auto hatchback with fwd and auto sedan with fwd.   
+From the second zoomed plot, we can see more about electric fuel type. Many auto hatchback with fwd use electric compared with other cars using electric. 
+
+13.Plot odometer reading and age of car? Is there a relationship? Similarly, plot odometer reading and price? Interpret the result(s). Are odometer reading and age of car related?
+```{r,,message = FALSE, warning = FALSE}
+vage2 = vage[ !is.na(vage$age) & !is.na(vage$odometer), ] #take out missing values in age and odometer variables.
+head(sort(vage2$odometer, decreasing = TRUE)) #Plan to omit some very large values in the plot to make the plot more interpretable
+ggplot(vage2, aes(x = as.factor(age), y = odometer)) +
+  geom_boxplot()+
+  theme(axis.text.x  = element_text(size= 4, color = "black")) +
+  ylim(c(0,500000))
+```
+
+From the boxplot, between age 0 and 25, the odometer becomes somewhat large when age becomes large. After age 25, the odometer is usually smaller. And the amount of cars are decreasing when age increases. 
+```{r,,message = FALSE, warning = FALSE}
+vposts2 = vposts[ !is.na(vposts$price) & !is.na(vposts$odometer), ] #take out missing values in price and odometer variables.
+ggplot(vposts2, aes(x = price, y = odometer)) +
+  geom_point() +
+  xlim(c(0, 30000)) +
+  ylim(c(0,500000)) +
+  geom_smooth()
+```
+
+From the plot smooth line, the odometer becomes slightly large when price becomes high and smaller than 2000. But basically their relationship is not obvious because the line tends to be straight.   
+```{r,,message = FALSE, warning = FALSE}
+with(vage2, cor(odometer,age))
+```
+I calculated the correlation between odometer and age which shows 0.004. The relationship between them is very small.
+
+14. Identify the "old" cars. What manufacturers made these? What is the price distribution for these?
+
+From the boxplot in question 13, odometer increases more obviously when age(<10) increases. So I'd like to identify the old cars whose age is larger than 10.
+```{r,message = FALSE, warning = FALSE}
+oldsub = vage[vage$age > 10,]
+unique(oldsub$maker)  #The output shows which manufacturers make old cars.
+
+oldsub2 = oldsub[ !is.na(oldsub$age) & !is.na(oldsub$price), ]
+ggplot(oldsub2, aes(x = age, y = price)) +
+  geom_point()+
+  ylim(c(0, 30000))+
+  geom_smooth()
+``` 
+
+The smoothing line on the ggplot shows the price distribution on the age of old cars. The price becomes slightly high when the age is getting large.  
+
+
+15.I have omitted one important variable in this data set. What do you think it is? Can we derive this from the other variables? If so, sketch possible ideas as to how we would compute this variable.
+
+I think probably which country is the manufacturer from is omited in the data. For example, Honda, Nissan, toyota and so on are Japanese manufacturer while Dodge, GMC, Ford and so on are American manufacturer. We can derive this "country" varaible from "maker". Firstly, unique(vposts$maker) to see all the brands names. And then create a column to show which country the manufacturer is from corresponding to every brand. 
+
+16.Display how condition and odometer are related. Also how condition and price are related. And condition and age of the car. Provide a brief interpretation of what you find.
+```{r,message = FALSE, warning = FALSE}
+table(vposts$condition) # choose the conditions with high quantities and reorder the conditions.
+#set 9 levels:
+vposts$condition = ordered(as.character(vposts$condition),  levels = c("new", "like new", "excellent", "very good", "good", "used","fair", "certified", "salvage")) 
+quantile(na.omit(vposts$odometer), probs = seq(0, 1, 0.10)) # decide to set the y limit as (0, 20,0000)
+par(mar = c(5.1, 2.1, 4.1, 2.1), xpd = FALSE)
+with(vposts, boxplot(odometer~condition, ylim = c(0, 200000), 
+                     xlab = "condition", ylab="odometers",
+                     main ="relationship between condition and odometer", 
+                     cex.axis = 0.45))
+quantile(na.omit(vposts$age), probs = seq(0, 1, 0.10))# decide to set the y limit as (0, 20)
+with(vposts, boxplot(age~condition, xlab = "condition", ylim = c(0, 20), ylab="age",
+                     main ="relationship between condition and age", 
+                     cex.axis = 0.45))
+```
+
+From the boxplot with the relationship between condition and odometer, we can know the better condition cars usually have less odometer median. The odometer range of salvage cars is very large while the odometer range of certified cars is pretty small. 
+From the boxplot with the relationship between condition and age, the better condition cars usually have lower age median. The age range of new cars is very large while the age range of certified cars is pretty small.
+
+
+
+
+
+
+
+
+

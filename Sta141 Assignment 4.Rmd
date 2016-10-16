@@ -1,0 +1,318 @@
+---
+title: "Sta141 Assignment 4"
+output: html_document
+---
+
+```{r, warning=FALSE}
+options(width = 110) 
+setwd("~/Desktop/2015 fall/STA 141")
+print(load("vehicles.rda"))
+#Get all names of variables
+names(vposts)
+```
+
+
+1.
+```{r, warning=FALSE}
+#Define a price Pattern: starting with a $ sign and one or more 0-9 number follows and then 0 or more , or 0-9 number follows. 
+pricePattern = '.*(\\$[0-9]+[,0-9]*).*'
+table(grepl(pricePattern, vposts$body)) #get 14409 price from the body 
+#Get all the price in each body
+grabPrice = regmatches(vposts$body,gregexpr("\\$[0-9]+[,0-9]*",vposts$body))
+#Remove the $ in the price for the future comparing with vposts$price.
+removeSign = lapply(grabPrice,function(i) gsub('\\$','',i))
+#Romove the "," for successfully converting the character to numeric 
+removeComma = lapply(removeSign, function(i) gsub('\\,', '', i))
+#Convert character to numeric type and then choose the largest number
+#since there are usually smaller price showing in the body which are not the car price and then unlist them for future comparison
+getPrice = unlist(lapply(removeComma,function(i) max(as.numeric(i))))
+#Extract the price from the body column
+head(getPrice, 3)
+#Check if it agrees with the actual price in the price column
+table(getPrice == vposts$price) #There are 9842 agreeing with the actual price
+```
+
+
+2.
+
+
+```{r, warning=FALSE}
+#Define a VIN number pattern: starting with VIN and then 0 or more space or 0 or more punctuations (":" or "#"), then 17 capital words or 0-9 numbers.
+vinPattern = 'VIN[[:space:][:punct:]]*[0-9A-Z]{17}' 
+#get the table if VIN pattern shows in the body.
+table(grepl(vinPattern, vposts$body, ignore.case = TRUE))
+```
+I got 6572 VIN number in the body column and 28105 rows don't have VIN number. 
+
+```{r, warning=FALSE}
+#Grab VIN number from the body but the non-matched elements will be grabbed too. 
+grabVin = gsub('.*(VIN[[:space:][:punct:]]*)([0-9A-Z]{17}).*', '\\2', vposts$body, ignore.case = TRUE)
+#Create a column named VIN but it will contains some rows with the whole body because they are unmatched elements. 
+vposts$VIN = grabVin
+#Get the row numbers of the unmatched elements which is the whole body 
+NrowVIN =  which(!grepl('^[0-9A-Z]{17}$', grabVin, ignore.case = TRUE))
+#Use NA to replace those unmatched elements. 
+vposts$VIN = replace(vposts$VIN, NrowVIN, NA)
+
+#Check the new VIN column
+table(is.na(vposts$VIN))
+head(vposts$VIN, 3)
+```
+We can see in the new VIN column, there are 28105 NAs and 6572 VIN numbers. This matches the number what I found at the beginning. ( 6572 VIN number in the body column and 28105 rows don't have VIN number. )
+
+
+
+3.
+```{r, warning=FALSE}
+#Define a phone number pattern: starting with a punctuation or not ("(" or not) and then three numbers, then 0 or more space or 0 or more punctuations ("-" or ")"), then three numbers, then 0 or more space or 0 or more punctuations ("-"), then four numbers.
+phonePattern = '[[:punct:]]*[0-9]{3}[[:space:][:punct:]]*[0-9]{3}[[:space:][:punct:]]*[0-9]{4}'
+#get the table if phone pattern shows in the body.
+table(grepl(phonePattern, vposts$body))
+```
+I got 16623 Phone number in the body column and 18054 rows don't have phone number. 
+
+```{r, warning=FALSE}
+#Grab phone number from the body but the non-matched elements will be grabbed too. 
+grabPhone = gsub('.*([[:punct:]]*[0-9]{3}[[:space:][:punct:]]*[0-9]{3}[[:space:][:punct:]]*[0-9]{4}).*', '\\1', vposts$body)
+#Create a column named Phone but it will contains 28105 rows with the whole body because they are unmatched elements. 
+vposts$Phone = grabPhone
+#Get the row numbers of the unmatched elements which is the whole body 
+NrowP =  which(!grepl('^[[:punct:]]*[0-9]{3}[[:space:][:punct:]]*[0-9]{3}[[:space:][:punct:]]*[0-9]{4}$', grabPhone))
+#Use NA to replace those unmatched elements. 
+vposts$Phone = replace(vposts$Phone, NrowP, NA)
+#Regulate all the phone number formats as xxx-xxx-xxxx to look nice
+vposts$Phone = gsub('([0-9]{3})[[:space:][:punct:]]*([0-9]{3})[[:space:][:punct:]]*([0-9]{4})', '\\1-\\2-\\3', vposts$Phone)
+#Check the new Phone column
+table(is.na(vposts$Phone))
+head(vposts$Phone, 10)
+```
+We can see in the new phone column, there are 18054 NAs and 16623 phone numbers. This matches the number what I found at the beginning. ( 16623 phone number in the body column and 18054 rows don't have phone number. )
+
+
+
+4.
+```{r, warning=FALSE}
+#Define an email pattern: starting with one or more space (including \n) or punctuation or not or numbers or words, then @ then one or more punctuation or not or numbers or words then"." then three alphabets. (like com, edu, so on)
+emailPattern = '[[:space:]][[:alnum:][:punct:]]+@[[:alnum:][:punct:]]+?\\.[[:alpha:]]{3}'
+#get the table if email pattern shows in the body.
+table(grepl(emailPattern, vposts$body))
+```
+I got 107 email pattern in the body column.
+```{r, warning=FALSE}
+#Grab email pattern from the body but the non-matched elements will be grabbed too. 
+grabEmail = gsub('.*[[:space:]]([[:alnum:][:punct:]]+@[[:alnum:][:punct:]]+?\\.[[:alpha:]]{3}).*', '\\1', vposts$body)
+#Create a column named Email but it will contains some rows with the whole body because they are unmatched elements. 
+vposts$Email = grabEmail
+#Get the row numbers of the unmatched elements which is the whole body 
+NrowE =  which(!grepl('^[[:alnum:][:punct:]]+@[[:alnum:][:punct:]]+?\\.[[:alpha:]]{3}$', grabEmail))
+#Use NA to replace those unmatched elements. 
+vposts$Email = replace(vposts$Email, NrowE, NA)
+#Check the new Email column
+table(is.na(vposts$Email))
+head(vposts$Email[grepl(emailPattern, vposts$body)])
+```
+We can see in the new new column, there are 34570 NAs and 107 emails. This matches the number what I found at the beginning. ( 107 email pattern in the body column.)
+
+
+
+5.
+
+Since the body contains lots of number information such as price, phone number and so on, I chose to use description to extract the year which is simpler.  
+```{r, warning=FALSE}
+#Define the year pattern: first two numbers are either 19 or 20 and then are followed by two 0-9 numbers
+yearPattern = '.*((19|20)[0-9][0-9]).*'
+table(grepl(yearPattern, vposts$description)) #get 29436 year from the description 
+#Get all the year in each description
+grabY = gsub(yearPattern,'\\1', vposts$description)
+#Get the row numbers of the unmatched elements which is the whole description 
+NrowY =  which(!grepl('^(19|20)[0-9][0-9]$', grabY))
+rowY =  which(grepl('^(19|20)[0-9][0-9]$', grabY))
+
+#Check how many the same with the year column
+table(vposts$year[rowY] == grabY[grepl(yearPattern, vposts$description)]) #28695 are the same with the year column
+#Check some grabbed year pattern 
+head(grabY[grepl(yearPattern, vposts$description)])
+```
+After checking the table, 28695 from the grabbed year are the same with the year column.
+
+
+6.
+
+```{r, warning=FALSE}
+#First I found that most models follows the year and maker. So extract maker and use '|' to seperate them for future grabbing
+maker = paste(unique(vposts$maker), collapse  = "|")
+#create the pattern for extracting the model: use | meaning "or", and then followed by one or more space and got the statement after the possible space which is the model
+patternM = paste('.*(', maker, ')[[:space:]]*(.+).*', sep = '')
+patternM  #Pattern is like this
+table(grepl(patternM, vposts$header, ignore.case = TRUE)) #I found 30563 models matching
+#Grab the model name
+grabM = gsub(patternM,'\\2', vposts$header, ignore.case = TRUE)
+#change the unmatched model to NA
+grabM[grabM == vposts$header]=NA
+#create new column containing matched models and NAs
+vposts$model = grabM
+#Split the models according to the maker to see what the models are like under each maker(in total 72). Change the upper case into lower case in order to group the model accurately and prevent case sentitive 
+dataframe72 = split(tolower(vposts$model), tolower(vposts$maker)) 
+
+#First write a function to get the potential transformed true model names applied in each maker data frame
+#get the potential misspelled model names and true model names and then apply this function to get the misspelled model name changing into the corresponding true model names.
+getDistance = function(mistable, truetable){
+distance = adist(truetable,mistable)
+distance = as.data.frame(distance, row.names = truetable)
+#Give the col names in order to make the data frame easily interpreted
+colnames(distance)= mistable
+#get character length of the misspelled names
+nchar(mistable)
+#get character length of the true names
+nchar(truetable)
+#create a data frame containing the length of misspelled names and have the corresponding location to the distance table
+charLength = as.data.frame(matrix(rep(nchar(mistable),each = length(truetable)), nrow = length(truetable)))
+#we need to know which distance is smaller than possible mispelled character length because distance means how many different characters between the treated true and misspelled charaters. So if distance is smaller than possible mispelled character length, the smaller distance is, the higher possiblity they are the same. 
+#transform distance larger or equal to possible mispelled character length into NAs. 
+distance[distance >= charLength] = NA
+#Get the true character names which have the samllest distance with the possible misspelled characters 
+disMin = apply(distance, 2, which.min)
+if(length(disMin) == 0){disMin = rep(NA,ncol(distance))}
+#get the potential true names
+getTrue = lapply(unname(disMin), names)
+#Transform the empty element into NAs (which don't have the character smaller than the character length)
+getTrue[sapply(getTrue, length) == 0] = NA
+#Get the mistableT as the result of transforming the misspelled table into the potential true table
+mistableT = unlist(getTrue) 
+#Select the NA elements and let them equal to the original mistable value
+mistableT[which(is.na(mistableT))] = mistable[which(is.na(mistableT))]
+#get the transformed potential true table
+names(mistableT) = mistable  #give the transformed names their original names as the column name 
+mistableT #return transformed table
+}
+
+#get the models table of each maker
+tableM = sapply(dataframe72, table)
+#get the number of models under each maker
+modelN = lapply(tableM, length)
+#get how many show times under each model in each maker
+show = lapply(tableM, function(t) unname(t))
+#get the total number of all models showtimes under each maker 
+total = lapply(show, sum)
+#Remove the maker which don't have the models 
+Nonzero = sapply(1:length(modelN) , function(i) (modelN[[i]] != 0))
+#get the average showing number per model and I plan to use this number as the lowest times it should show. The showing times below this number will be treated as possibly misspelled.  
+prop = mapply(function(x,y) x/y, total[Nonzero], modelN[Nonzero])
+#Remove the maker table which don't have the models  
+tableM = tableM[Nonzero]
+#Get the misspelled table and true value table 
+mistableW =sapply(1:length(tableM), function(i) names(tableM[[i]][unname(tableM[[i]]) <prop[[i]]]))
+truetableW = sapply(1:length(tableM), function(i) names(tableM[[i]][unname(tableM[[i]]) >= prop[[i]]]))
+#get the transformed names
+getTransformedName = 
+  lapply(1:67, function(i) 
+    if(length(mistableW[[i]]) == 0){return(mistableW[[i]])}  #if there is no misspelled name, returns the original names
+         else{getDistance(mistableW[[i]],truetableW[[i]])})  #else, apply the getDistance function to get the transformed name table
+getTransformedName = unlist(getTransformedName)
+#The first line is the model names while the second line is the transformed correct model names. 
+head(getTransformedName, 20)
+#Write a function to get the corresponding new model name (if there is no)
+getCorrespond = 
+  function(eachModel, getTransformedName){
+  if(eachModel %in% getTransformedName) {getTransformedName[eachModel]}
+  else {eachModel}
+  }
+#Using the function to revise model column
+vposts$model = sapply(vposts$model, function(i) getCorrespond(i, getTransformedName))
+head(vposts$model)
+```
+
+
+
+Modeling:
+```{r, warning=FALSE}
+#check which models have the largest number
+head(sort(table(vposts$model), decreasing = TRUE))#Camry and Accord have the largest number  
+table(vposts$maker[vposts$model == 'Camry']) #we got Camry's maker is Toyota
+table(vposts$maker[vposts$model == 'Accord']) #we got Accord's maker is Honda
+vposts$age = 2015 - vposts$year  #add a new column age.
+#According to the solution of HW1, the condition is like :
+# Define new categories.
+new_cats = list(
+  excellent = c("excellent"), good = c("good", "very good"),  "like new" = c("like new", "mint", "new", "pre owned", "pre-owned", "preowned", "preownes"), used = c("0used", "used"), fair = c("fair", "nice", "nice teuck"), salvage = c("complete parts car, blown engine", "front side damage", "hit and run :( gently", "muscle car restore", "needs bodywork", "needs restoration!", "needs restored", "needs total restore", "needs work", "needs work/for parts", "nice rolling restoration", "not running", "parts", "project", "project car", "rebuildable project", "restoration", "restoration project", "restore", "restored", "salvage", "rough but runs"),  
+    other = c("207,400", "ac/heater", "carfax guarantee!!", "certified", "honnda", "superb original" ))
+# Convert conditions to new categories.
+vposts$new_cond = vposts$condition
+levels(vposts$new_cond) = c(levels(vposts$new_cond), "other")
+for (i in seq_along(new_cats)) {
+  new_cat = names(new_cats)[[i]]
+vposts$new_cond[vposts$new_cond %in% new_cats[[i]]] = new_cat
+}
+vposts$new_cond = factor(vposts$new_cond)
+#Create a model using Camry
+vposts1 = vposts[(vposts$model == 'Camry') & !is.na(vposts$model),]
+xC1 = vposts1$odometer
+xC2 = vposts1$age
+xC3 = vposts1$new_cond
+yC = vposts1$price
+#Check the pairwise scatterplot and we can see some linear pattern in the plots so I chose to use linear regression model
+pairs(~yC+xC1+xC2)
+fitC = lm(yC~xC1+xC2+factor(xC3)) #create the linear regression model by using price as the response and other three as predictors
+#Check the assumption
+par(mfrow=c(1,2))
+plot(fitC, which=1)  ##residuals vs. fitted values
+plot(fitC, which=2)  ##residuals Q-Q plot
+```
+From the residuals vs fitted values plot, we cannot see obvious linear pattern which means constant variance of residuals.
+From the normal QQ plot, although it shows a little bit heavy tailed, it is basically nice to say residauls follows normal distribution. So assumptions satisfied and I am good to use linear regression model. 
+
+```{r}
+summary(fitC)
+```
+From the summary table, we can see Multiple R-squared:  0.8765 which means 87.65% data can be explained by the model I constructed and it shows the model is good. 
+The p-values of the condition variable are almost large than 0.05 which means condition is not so significant in the model. So condition has less effect on the price. From the estimated coefficient and the scatterplot, odometer and age has negative effect on the price. 
+
+
+```{r}
+#Create a model using Accord
+vposts2 = vposts[(vposts$model == 'Accord') & !is.na(vposts$model),]
+xA1 = vposts2$odometer
+xA2 = vposts2$age
+xA3 = vposts2$new_cond
+yA = vposts2$price
+#Check the pairwise scatterplot and we can see there is an very large outlier in the price so we should take it out  
+pairs(~yA+xA1+xA2+xA3)
+quantile(yA, na.rm = TRUE, probs = seq(0, 1, 0.05))
+#Transform the value outside the 5% and 95% into NAs
+yA[yA < 937.5 | yA > 21924.25]= NA
+range(yA, na.rm = TRUE) #check the range and it makes more sense now
+#Check the pairwise scatterplot and we can see some linear pattern in the plots so I chose to use linear regression model
+pairs(~yA+xA1+xA2)
+fitA = lm(yA~xA1+xA2+factor(xA3)) #create the linear regression model by using price as the response and other three as predictors
+#Check the assumption
+par(mfrow=c(1,2))
+plot(fitA, which=1)  ##residuals vs. fitted values
+plot(fitA, which=2)  ##residuals Q-Q plot
+```
+From the residuals vs fitted values plot, we can see obvious curvilinear pattern which means there is polynominal term showing. And according to scatterplot, the relationship between yA(price) with xA2(age) looks more curvilinear. So I add age^2 term into the model. 
+From the normal QQ plot, it is basically nice to say residauls follows normal distribution.
+```{r}
+fitA2 = lm(yA~xA1+xA2+I(xA2^2) +factor(xA3))
+par(mfrow=c(1,2))
+plot(fitA2, which=1)  ##residuals vs. fitted values
+plot(fitA2, which=2)  ##residuals Q-Q plot
+```
+No obvious non-linear pattern in the residuals vs fitted values plot now. So assumptions satisfied and I am good to use linear regression model. 
+
+```{r}
+summary(fitA2)
+```
+From the summary table, we can see Multiple R-squared:  0.9486 which means 94.86% data can be explained by the model I constructed and it shows the model is good. 
+The p-values of the some condition variables are almost large than 0.05 which means condition is not so significant in the model. So condition has less effect on the price in the Accord cars as well. From the estimated coefficient and the scatterplot, odometer and age has negative effect on the price. 
+
+```{r}
+#Checking if city has effects on the price in two models
+boxplot(yC~vposts1$city, main = 'boxplot between city and price about Camry car')
+boxplot(yA~vposts2$city,  main = 'boxplot between city and price about Accord car')
+```
+By checking the boxplot, under these two models, different city has very different distribution and different mean of the price. So city should have effect on the price. This effect might be decided by if the city is closed to the sea or not, the culture of the city and the population. 
+
+These two models are basically nice (large R-squared, assumption satisfied, small p-value on odometer and age which means significance). So I want to use them when I buy a car. I bought a 2011 used Accord recently and I used this model to get the price: 
+2.107e+04 -(1.263e-02)*45321-1716*4 +41.28*16 + 27.84 = 14321.92. My car's price was 14999 and it is similar with 14321.92. So I think this model is pretty good. 
+
+

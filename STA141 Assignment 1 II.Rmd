@@ -1,0 +1,115 @@
+---
+title: "STA141 Assignment 1 II"
+output: html_document
+---
+
+1.Find at least 3 types of anomalies in the data. Provide succinct justification for identifying them as anomalies. Then correct the corresponding observations appropriately, again providing justification. What impact does this have on analyzing the data?
+
+Firstly I think the condition of the data is pretty messy. There are a lot of levels with different names but indicating one thing. For example, the condition "pre owned", "pre-owned", "preowned", "preownes" actually indicate one thing. Since car conditions are very important information to the buyers,it is necessary to make the conditions clearer for the convenience of data analysis. 
+```{r,message = FALSE, warning = FALSE}
+setwd("~/Desktop/2015 fall/STA 141")
+print(load("vehicles.rda"))
+levels(vposts$condition)  # check all levels in condition
+preowned = c("carfax guarantee!!", "pre owned", "pre-owned", "preowned", "preownes","mint") 
+
+# I googled mint condition and it means pre-owned. For the weird conditions, I either checked the body of it or checked the website. And then get the information of which condition level they should be. 
+
+needRestoration = c("complete parts car, blown engine", "front side damage",
+                    "hit and run :( gently","needs bodywork", 
+                    "needs restoration!", "needs restored","needs total restore" 
+                    ,"needs work","needs work/for parts",
+                    "rough but runs" )
+restored = c("muscle car restore","nice rolling restoration", "restoration" 
+             ,"restore", "restored" )
+project = c("project", "project car","rebuildable project","restoration project")
+parts = "not running"
+excellent = c("superb original", "very good")  
+used = c("0used","ac/heater", "honnda")
+good = c("207,400", "nice","nice teuck")
+cnd = as.character(vposts$condition)  
+cnd[cnd %in% preowned] = "preowned" 
+cnd[cnd %in% needRestoration] = "needRestoration"
+cnd[cnd %in% restored] = "restored"
+cnd[cnd %in% parts] = "parts"
+cnd[cnd %in% excellent] = "excellent"
+cnd[cnd %in% used] = "used"
+cnd[cnd %in% good] = "good"
+cnd[cnd %in% project] = "project"
+vposts$updatedCondition = factor(cnd) #cnd is character
+levels(vposts$updatedCondition)  #Then we have 12 levels in total which looks more tidy and clearer. 
+```
+
+Second, from our common knowledge, the cars with higher odometer should lead to lower price. But the relationship between odometer and price is not exactly like what we think.   
+```{r,,message = FALSE, warning = FALSE}
+vposts2 = vposts[ !is.na(vposts$price) & !is.na(vposts$odometer), ] 
+#take out missing values in price and odometer variables.
+library(ggplot2)
+ggplot(vposts2, aes(x = price, y = odometer)) +
+  geom_point() +
+  xlim(c(0, 30000)) +
+  ylim(c(0,500000)) +
+  geom_smooth()
+```
+From ggplot, at the beginning of the trend, we can see higher the price is, larger the odometer is. It is very anomalously. Then the odometer decreases with increasing of the price but the trend is not obvious. Considering probably outliers of odomoter and price causes the trend like this, I plan to detect and process odomoter & price outliers. And plot again.    
+```{r,,message = FALSE, warning = FALSE}
+quantile(vposts2$odometer, seq(0,1,by= 0.05)) # Plan to omit the values in the plot larger than 200000 and smaller than 150
+quantile(vposts2$price, seq(0,1,by= 0.05))  # Plan to omit the values in the plot larger than 35000 and smaller than 500
+vposts3 = vposts[ !is.na(vposts$price) & !is.na(vposts$odometer) & (vposts$price > 500) & (vposts$odometer < 200000) & (vposts$price < 35000) & (vposts$odometer > 150), ] 
+#take out missing values in price and odometer variables.
+ggplot(vposts3, aes(x = price, y = odometer)) +
+  geom_point() +
+  geom_smooth()
+```
+From the new plot, the line makes more sense now. With the increasing of the price, odometer shows decreasing trend. This information is important because the relationship between odometer and price means a lot especially for buyers. It can help them choose the car with acceptable price and odometer. 
+
+Third, there are many werid values on the "year".
+```{r,message = FALSE, warning = FALSE}
+table(vposts$year) #From the table, we can see year = 4, 2016, 2022 make no sense.
+vposts[(vposts$year == 4) | (vposts$year == 2022) & !is.na(vposts$year), ] #check the body and description of year = 4 and 2022 but cannot get exact information 
+y = (vposts$year == 4) | (vposts$year == 2022) & !is.na(vposts$year)
+vposts[y, "year"] = c(2004, NA) #use 2004 and NA to substitue 4 and 2022
+```
+Information of a car's year is very important to buyers and investigators. That's why we need to detect anomalously years. As for 206 cars with year = 2016, we need to use the grepl to detect if the posters metioned the real years in the body description. Then use the year in the body to substitute them. 
+```{r,message = FALSE, warning = FALSE}
+vposts$year[vposts$year == "2016" & !is.na(vposts$year) & grepl("2016", vposts$body)] = 2015
+i = !is.na(vposts$year) & (vposts$year == 2016)
+v = grepl("20[0-1][0-9]",vposts$body[i])
+w = grepl("19[0-9][0-9]",vposts$body[i])
+i = which(i) #the location of true i
+vposts$year[i[v]] = as.integer(gsub(".*(20[0-1][0-9]).*", "\\1" , vposts$body[i[v]])) #Find year pattern in the body and substitute them.  
+vposts$year[i[w]] = as.integer(gsub(".*(19[0-9][0-9]).*", "\\1" , vposts$body[i[w]]))
+```
+After doing substitution, there are still 2016 in the year column since pattern is not found in the corresponding body. Having real years is important and prevent from causing misunderstanding to the buyers.   
+
+
+2.Find at least 3 interesting insights/characteristics/features illustrated by the data. Explain in what way these insights are interesting (to whom? why?) and provide evidence for any inference/conclusions you draw. How generalizable are these insights to other vehicle sales data?
+
+First, the relationship between price and odometer is interesting features to the buyers. After removing the outliers, the plot shows odometer decreases with the increasing of the price. This is very helpful for buyers to choose a car. The evidence is the plot showing in the problem 1(the second idea). 
+```{r,message = FALSE, warning = FALSE}
+fit1 = lm(odometer~price, data = vposts3)
+par(mfrow = c(2,2))
+plot(fit1)  #check the linear model assumptions and the plots show assumptions are basically satisfied. 
+summary(fit1)  #creating a linear model 
+```
+I created a linear model between these two variables. It showed very small p-value indicating there is significant linear relationship between price and odometer. Therefore, this conclusion might be generalizable to other vehicle sales data. 
+
+
+Second, the distribution of the car sales in the map is interesting to the data analysts.   
+```{r,message = FALSE, warning = FALSE}
+library(maps) 
+par(mfrow = c(1,1))
+map("state")
+points(vposts$long,vposts$lat, col = "red")
+```
+From the map, we can know which part of area has more car sales. Most cars are in California (southwest) and near Massachusetts state (northeast). Many of them are in Colorado and near Illinois. It is helpful to the data analysts doing the car selling statistics.  
+
+Third, the times of updating the posts are interesting. The reasons of updating can somewhat show the situation of cars selling. Like why the sellers keep refining their posts? Is that because they want to lower the price or make the cars condition look better to attract more buyers? What causes this situation probably because there is much car sale competition in that area.   
+```{r}
+update = with(vposts, split(updated, city))  
+summary(update) #To check how many times of updating in each city
+```
+From the output, we can see these cities updating times are pretty balanced. Chicago has a little bit fewer updating times. 
+
+
+
+

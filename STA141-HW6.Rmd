@@ -1,0 +1,214 @@
+---
+title: "stat 141 hw 6"
+output: word_document
+---
+
+
+
+
+
+##Part 1
+```{r, message = FALSE}
+setwd("~/Desktop/2015 fall/STA 141")
+library(XML)
+library(RCurl)
+#Under each parent class="question-summary" to find the information and form a data frame
+getpost = function(j) {  
+  question = xmlGetAttr(j, "id")
+  id = gsub(".*-([0-9]+)", "\\1",question)
+  user = xpathSApply(j, './/div[@class="user-details"]/a[contains(@href,"users")]', xmlValue)
+  date = unname(xpathSApply(j, './/div[@class="user-action-time"]/span/@title'))
+  tag = xpathSApply(j, './/div[@class="summary"]/div[2]', xmlValue, trim = TRUE)
+  tags = gsub(" ", '; ', tag) #replace the space with ;
+  title = unname(xpathSApply(j, './/div[@class="summary"]/h3', xmlValue))
+  urls = unname(xpathSApply(j, './/div[@class="summary"]/h3/a/@href'))
+  url = unname(sapply(urls, function(i) getRelativeURL(i,"http://stackoverflow.com/")))
+  view = xpathSApply(j, './/div[@class="statscontainer"]/div[3]', xmlValue, trim = TRUE)
+  views = gsub(" views", "",view)
+  votes = xpathSApply(j, './/div[@class="votes"]/span', xmlValue)
+  answers = xpathSApply(j, './/div[@class="stats"]/div[2]', xmlValue, trim = TRUE)
+  answers = gsub('[a-zA-Z]*',"", answers)
+  reputation = xpathSApply(j, './/span[@class="reputation-score"]' , xmlValue)
+  check = list(id = id,date =  date, tags = tags,title= title, url = url, views = views,
+               votes= votes, answers =answers, user = user,reputation=reputation)
+  transfer = lapply(check, function(i) if(is.null(i) | length(i) == 0) { NA } else{ i })
+  as.data.frame(do.call(cbind, transfer))
+}
+```
+
+
+
+```{r, message = FALSE}
+#Write a function about getting the next page url 
+getNextURL =
+function(doc)
+{
+    nxt = xpathSApply(doc, '//div[@class="pager fl"]/a[@rel="next"]/@href')
+    getRelativeURL(nxt, docName(doc))
+}
+
+```
+
+
+
+```{r, message = FALSE}
+#get the final dataframe by inputting the tag and the number of page
+finalframe =
+function(tag, numberpage = 'c')   
+{
+  doc = paste("http://stackoverflow.com/questions/tagged/",tag, 
+              "?page=1&sort=newest&pagesize=50", sep = "")
+  doc= htmlParse(doc)
+  add = NULL
+  #when there is number of page inputted
+  if (numberpage != 'c'){  
+    for(i in 1:numberpage){
+    #get each page postings  
+      onepage = xpathApply(doc, '//div[@class="question-summary"]', getpost)  
+        frame = do.call(rbind, onepage)
+        add = rbind(add, frame)
+  #length of tryCatch function = 0 means getNextURL has error which means the loop reaches the last page 
+        if (length(tryCatch(getNextURL(doc),  error=function(e) {})) != 0){
+        doc =htmlParse(getNextURL(doc)) }
+       else
+           { break }
+    }
+  }
+  #when no number of page is inputted, do all of pages
+  else{
+      while(TRUE) {
+        onepage = xpathApply(doc, '//div[@class="question-summary"]', getpost)
+        frame = do.call(rbind, onepage)
+        add = rbind(add, frame)
+        if (length(tryCatch(getNextURL(doc),  error=function(e) {})) != 0){
+        doc =htmlParse(getNextURL(doc)) }
+       else
+           { break }
+      }
+ }
+    return(add)
+}
+
+#saveRDS(finalframe("r"), file = "allposts.rds")
+mypost = readRDS("allposts.rds")
+dim(mypost)
+```
+
+
+
+##Part3
+
+
+#1.
+
+
+```{r, message = FALSE}
+load('rQAs.rda')
+#select type = answer or comment rows
+data1 = rQAs[(rQAs$type == 'answer'| rQAs$type == 'comment'),]
+#remove all NAs
+data1 = data1[!is.na(data1$userid),]
+#histgram plot about the number of users answering or commenting
+plot(hist(table(data1$userid)), 
+     main = "Histogram about the number of users answering or commenting", 
+     xlab = "The number of answers or comments") 
+#select type = answer rows
+data2 = rQAs[(rQAs$type == 'answer'),]
+#remove all NAs
+data2 = data2[!is.na(data2$userid),]
+plot(hist(table(data2$userid)), 
+     main = "Histogram about the number of users answering", 
+     xlab = "The number of answers")
+```
+
+Either doing answers and comments together or seprately will show the similar distributions that most users will have similar number of answering or commenting on questions. But when it reaches some point, the number of users starts to decrease for answering more questions. And there will be very fewer users to answer very large number of questions.     
+           
+#2.
+
+```{r, message = FALSE}
+#get all the individual tags
+gettags = unlist(strsplit(as.character(mypost$tags), "; "))
+#get 10 most common tags  
+head(sort(table(gettags), decreasing = TRUE), 10)
+```
+From output, we can know the most common tag is r which have 116847 posting containing it. The output shows 10 most common tags in order.  
+       
+#3. 
+
+```{r, message = FALSE}
+#select rows when type = question
+data3 = rQAs[(rQAs$type == 'question'),]
+#get the table about how many unique questions including  ggplot
+table(grepl("ggplot", unique(data3$text), ignore.case = TRUE))
+```
+From the table output, there are 957 questions about ggplot. 
+
+
+#4.  
+
+```{r, message = FALSE}
+#get the unique question id's all of information
+singleq = lapply(unique(rQAs$qid), function(i) rQAs[rQAs$qid == i,])
+#get which one involves XML, HTML or Web Scraping under each unique question id group
+truestat = lapply(1:length(singleq), function(i) sum(grepl("(XML)|(HTML)|(Web Scraping)", singleq[[i]]$text, ignore.case = TRUE)))
+#check how many questions involve XML, HTML or Web Scraping
+sum(unlist(truestat) != 0)
+```
+So there are 1327 unique questions involving XML, HTML or Web Scraping.
+
+
+#5.  
+```{r, message = FALSE}
+#install the packages which are popular in tags
+head(sort(table(gettags), decreasing = TRUE), 10)  #use results from Q2
+library(ggplot2)
+library(dplyr)
+library(data.table)
+library(shiny)
+library(Matrix)
+
+#get the table if there is function in all titles
+title = strsplit(as.character(mypost$title), "\\s|\\(|\\?")
+#Write a function for grabing all functions and can be used in question 6 using as well.
+title = unlist(title)
+functionCheck = sapply(1:length(title), function(i)
+     is.function(tryCatch(get(title[i]),  error=function(e) {})))
+length(unique(title[functionCheck]))
+head(sort(table(title[functionCheck]), decreasing = TRUE), 20)
+```
+I found 1378 functions metioned in the titles. And here is the table of the most 20 popular functions referenced in the titles. 
+
+First, I checked some popular tags and then chose to install five packages which showed in the popular tags. Then I used space, "(" and "?" to split the titles because some functions might be written with "(" or "?" such as plot(x,y) or ?plot. Then I used is.function and get() together to check how many functions are contained in the titles. 
+
+Pros & Cons : my strategy is pretty easy to handle and fast to process. But different people have different written style. For example, people may write a function name with some other punctutation not just "(" such as ggplot_ or "ggplot". Also, I only installed five pacakages which were popular in tags. These factors might lead to biased results. 
+
+
+#6
+```{r, message = FALSE}
+#extract data with type = comment & answer
+data6 = rQAs[(rQAs$type == 'answer'| rQAs$type == 'comment'),]
+#Find the code from data6 text
+pattern = "(<code>)(.*?)(</code>)"
+grabPattern = gregexpr(pattern, data6$text)
+grabPattern = regmatches(data6$text,grabPattern)
+#remove empty set
+grabPattern = grabPattern[lapply(grabPattern, length) >0]
+#remove <code> and </code> signs
+removeCode = lapply(grabPattern, function(i) gsub(pattern, "\\2", i))
+removeCode = unlist(removeCode)
+removeCode = strsplit(removeCode, "\\s|\\(|\\?")
+removeCode = unlist(removeCode)
+#check function in the code nodes
+codeCheck = sapply(1:length(removeCode), function(i)
+     is.function(tryCatch(get(removeCode[i]),  error=function(e) {})))
+length(unique(removeCode[codeCheck]))
+head(sort(table(removeCode[codeCheck]), decreasing = TRUE), 20)
+```
+
+
+First, I grabbed all the <code>...</code> sections under answers and comments not including <code> and </code> these two signs. Then I used space,"(" and "?" to split the strings I found because some functions might be written with "(" or "?" such as plot(x,y) or ?plot. Then I used is.function and get() together to check how many functions are contained in the texts codes. 
+
+
+
+
+

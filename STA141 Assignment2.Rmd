@@ -1,0 +1,187 @@
+---
+title: "STA141 Assignment 2"
+output: html_document
+---
+Step 1
+
+```{r}
+text = lapply(c("cloudhigh", "cloudmid", "cloudlow", "ozone", "pressure", "surftemp", "temperature"), function(p) list.files("NASA", pattern = p, full.names = TRUE  ))  #list all files
+
+readAll = function(filename)
+{
+  t = read.table(filename,skip = 7)  #read the file as data frame and skip the first 7 lines.
+  t = t[,-(2:3)]# remove useless columns
+  lat = as.character(t[,1])  #get the latitude for each observation
+  long = scan(filename,skip = 5, nlines = 1, what = character())#the longitude for each observation
+  value = t[,-1]   #get the values for that variable at each location in the grid
+  value = as.vector(as.matrix(value)) #convert data frame to vector 
+  date = strsplit(readLines(filename)[5], " ")[[1]][20] #get the date the observations were recorded
+  form = cbind(value, latitude = rep(lat, each = 24), longitude = rep(long, 24), Date = rep(date, 576) )  #combine value, longitude, latitude and date together
+  form = as.data.frame(form)  #convert the vector to a dataframe
+  return(form)
+}
+# arrange the data in that single file into a data frame with columns
+arrange = lapply(1:7, function(i) lapply(text[[i]], readAll))
+#combine the different data frames across the files by stacking them together
+form2 = lapply(1:7, function(i) do.call(rbind, arrange[[i]]))
+varNames = c("cloudhigh", "cloudmid", "cloudlow", "ozone", "pressure", "surftemp","temperature")
+names(form2) = varNames   #give each list their names
+as.data.frame(lapply(form2, head)[1])  #cloudhigh dataframe
+as.data.frame(lapply(form2, head)[2])   #cloudmid dataframe
+as.data.frame(lapply(form2, head)[3])  #cloudlow dataframe
+as.data.frame(lapply(form2, head)[4])  #ozone dataframe
+as.data.frame(lapply(form2, head)[5])  #pressure dataframe
+as.data.frame(lapply(form2, head)[6])  #surftemp dataframe
+as.data.frame(lapply(form2, head)[7])  #temperature dataframe
+```
+
+
+Step 2
+```{r}
+#1.
+#From the step 1, combine the different data frames across the files by stacking them together
+form2 = lapply(1:7, function(i) do.call(rbind, arrange[[i]])) 
+#form2 is a list of 7 variables containing all files
+checkEq = function(x,y) { 
+  identical(x[,2:4], y[,2:4])  
+  #declare a function to check if column longitude, latitude and date are equal
+}
+#apply this function to compare every list in form2 with the first list(cloudhigh data)
+sapply(form2, checkEq, y = form2[[1]])
+#All are true meaning column longitude, latitude and date are all equal in these 7 variables 
+
+#2
+#For convenience, I named every variable dataframe. 
+ch = as.data.frame(form2[1])  #cloudhigh dataframe
+cm = as.data.frame(form2[2])   #cloudmid dataframe
+cl = as.data.frame(form2[3])  #cloudlow dataframe
+oz = as.data.frame(form2[4])  #ozone dataframe
+pr = as.data.frame(form2[5])  #pressure dataframe
+sf = as.data.frame(form2[6])  #surftemp dataframe
+tm = as.data.frame(form2[7])  #temperature dataframe
+#Select the cloudhigh dataframe and adding others into it
+#extract each variable's first column from form2 
+f = lapply(form2, function(p) as.data.frame(p[,1],stringsAsFactors = FALSE, optional = FALSE))
+ch = ch[,-1]  #delete the cloudhigh value for now
+f = do.call(cbind, f)
+col = c('cloudhigh', "cloudmid", "cloudlow", "ozone", "pressure", "surftemp", "temperature")
+names(f) = col #give column names
+allForm = cbind(ch,f)
+allForm = allForm[,c(3,1,2,4,5,6,7,8,9,10)]  #make date at the first column
+head(allForm)  #generate all into one dataframe
+dim(allForm)
+```
+
+
+
+Step 3
+```{r}
+eval = readLines("NASA/intlvtn.dat")
+eval =strsplit(eval, split = " ")
+long = round(as.numeric(eval[[1]]), digits = 1)  #generate the row of longitude
+tmp = eval[-1] #remove the longitude row
+lat = sapply(tmp, `[`, 1) 
+lat = round(as.numeric(lat), digits = 1) #generate the row of latitude
+tmp = sapply(tmp, `[`, -1)  #only get values
+value1 = as.numeric(as.vector(tmp)) #get the value as vector
+formE = cbind(latitude = rep(lat, each = 24), longitude = rep(long, 24), Elevation = value1)
+formE = as.data.frame(formE) #get the elevation form
+formE
+
+allForm$latitude = gsub("N", "", allForm$latitude) #delete N in the latitude because of positive value
+i = grepl("S", allForm$latitude)
+allForm$latitude[i] = paste("-", allForm$latitude[i], sep = "")  #give negative sign to each south latitude
+allForm$latitude[i] = gsub("S", "",allForm$latitude[i]) #delete S
+table(allForm$latitude)#check if succeed.
+table(allForm$longitude)  #all longitude is west
+allForm$longitude = gsub("W","",allForm$longitude) #delete W in all longitude
+allForm$longitude = paste("-", allForm$longitude, sep = "") #give negative sign to each west longitude
+head(allForm)  #check the whole form
+allForm$latitude = as.numeric(allForm$latitude)
+allForm$longitude =  as.numeric(allForm$longitude)
+identical(allForm$latitude[1:576], formE$latitude)  
+identical(allForm$longitude[1:576], formE$longitude)
+#After checking, the elevation form's longtitude and latitude columns are identical with them in the whole form from 1st to 576 columns. So we can combine them directly. 
+allForm$Elevation = rep(formE$Elevation, 72)
+head(allForm)
+```
+
+
+  
+  
+Step 4
+
+
+1.
+```{r}
+step4 = allForm #For convenience, give the new name to the whole data frame. 
+step4$temperature = as.numeric(as.character(step4$temperature))
+step4$pressure = as.numeric(as.character(step4$pressure))
+step4$cloudlow = as.numeric(as.character(step4$cloudlow))
+plot(step4$pressure, step4$temperature, cex = 0.5,  main = "pressure vs temperature", xlab = "pressure", ylab = "temperature", col = step4$cloudlow)
+```
+
+
+
+2.
+```{r}
+allForm$Date = as.character(allForm$Date)
+Sys.setlocale("LC_TIME", "C")  #changed the system language
+allForm$Date = as.Date(allForm$Date,"%d-%b-%Y")  #changed the time as numeric
+step4$Date = allForm$Date
+#Get the four corner points
+nw1 = subset(step4, (longitude == -113.8) & (latitude == 36.2))
+nw1 = nw1[order(nw1$Date),]
+nw2 = subset(step4, (longitude == -56.2) & (latitude == 36.2))
+nw2 = nw2[order(nw2$Date),]
+sw1 =subset(step4,(longitude == -113.8) & (latitude == -21.2))
+sw1 = sw1[order(sw1$Date),]
+sw2 = subset(step4, (longitude == -56.2) & (latitude ==-21.2))
+sw2 = sw2[order(sw2$Date),]
+#Get the plots with date vs temperature of these four corner points
+par(mfrow = c(2,2))
+plot(sort(nw1$Date),nw1$temperature, type = "l")
+plot(sort(nw2$Date),nw2$temperature, type = "l")
+plot(sort(sw1$Date),sw1$temperature,type = "l")
+plot(sort(sw2$Date),sw2$temperature,type = "l")
+```
+
+
+
+
+3.
+```{r, message= FALSE}
+step4$cloudhigh = as.numeric(as.character(step4$cloudhigh))
+step4$cloudmid = as.numeric(as.character(step4$cloudmid))
+step4$cloudlow = as.numeric(as.character(step4$cloudlow))
+step4$ozone = as.numeric(as.character(step4$ozone))
+step4$surftemp = as.numeric(as.character(step4$surftemp))
+step4$pressure = as.numeric(as.character(step4$pressure))
+step4$temperature = as.numeric(as.character(step4$temperature))
+stepMean = aggregate(step4, by = list(step4$longitude, step4$latitude), FUN = mean)
+stepSD = aggregate(step4, by = list(step4$longitude, step4$latitude), FUN = sd)
+head(stepMean) #data frame showing average value for each of the 7 variables across time.
+head(stepSD) #data frame showing standard deviation value for each of the 7 variables across time.
+```
+
+
+4.
+```{r, message= FALSE}
+library(maps)
+par(mfrow = c(1,1))
+#get the x limit and y limit 
+range(stepMean$longitude)  
+range(stepMean$latitude)
+map("world", mar = c(0,0,0,0), xlim = c(-113.8, -56.2), ylim= c(-21.2, 36.2)) #plot the map
+points(stepMean$longitude, stepMean$latitude, col = stepMean$pressure , cex = .4)
+```
+
+
+5.
+```{r}
+plot(stepMean$Elevation, stepMean$surftemp, cex = 0.4, xlab = "Elevation", ylab = "Surface temperature") #we can see surface temperature firstly decreases with increasing of elevation and then stays the same.
+```
+
+
+
+  
